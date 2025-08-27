@@ -133,7 +133,7 @@ export default function HomePage() {
         
         {loading ? (
           <div className="flex justify-center items-center h-64">
-            <Spin size="large" tip="Loading products..." />
+            <Spin size="large" />
           </div>
         ) : error ? (
           <div className="flex justify-center items-center h-64">
