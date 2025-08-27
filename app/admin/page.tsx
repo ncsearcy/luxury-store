@@ -2,227 +2,230 @@
 
 import React, { useEffect, useState } from 'react'
 import { 
-  Card, 
-  Row, 
-  Col, 
-  Statistic, 
   Table, 
-  Tag, 
   Button, 
-  Space,
-  Spin
+  Space, 
+  Tag, 
+  Image, 
+  Modal, 
+  message,
+  Input,
+  Card
 } from 'antd'
 import { 
-  ShoppingOutlined, 
-  UserOutlined, 
-  DollarOutlined, 
-  ShoppingCartOutlined,
-  WarningOutlined
+  PlusOutlined, 
+  EditOutlined, 
+  DeleteOutlined, 
+  SearchOutlined 
 } from '@ant-design/icons'
 import Link from 'next/link'
+import { Product } from '@/types'
 
-interface DashboardStats {
-  totalProducts: number
-  totalOrders: number
-  totalUsers: number
-  totalRevenue: number
-}
+const { Search } = Input
 
-interface RecentOrder {
-  id: string
-  customerName: string
-  total: number
-  status: string
-  createdAt: string
-}
-
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProducts: 0,
-    totalOrders: 0,
-    totalUsers: 0,
-    totalRevenue: 0
-  })
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+export default function AdminProducts() {
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
-        // Mock data - replace with actual API calls
-        setStats({
-          totalProducts: 127,
-          totalOrders: 1,
-          totalUsers: 4,
-          totalRevenue: 15420.50
-        })
-        
-        setRecentOrders([
-          {
-            id: '1',
-            customerName: 'John Doe',
-            total: 1299.99,
-            status: 'completed',
-            createdAt: '2025-01-15'
-          }
-        ])
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchDashboardData()
+    fetchProducts()
   }, [])
 
-  const orderColumns = [
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      // Include inactive products for admin panel
+      const response = await fetch('/api/products?includeInactive=true')
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
+      } else {
+        message.error('Failed to fetch products')
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      message.error('Error loading products')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (productId: string) => {
+    Modal.confirm({
+      title: 'Delete Product',
+      content: 'Are you sure you want to delete this product? This action cannot be undone.',
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          const response = await fetch(`/api/products/${productId}`, {
+            method: 'DELETE'
+          })
+          
+          if (response.ok) {
+            message.success('Product deleted successfully')
+            fetchProducts() // Refresh the list
+          } else {
+            message.error('Failed to delete product')
+          }
+        } catch (error) {
+          console.error('Error deleting product:', error)
+          message.error('Error deleting product')
+        }
+      }
+    })
+  }
+
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.category.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const columns = [
     {
-      title: 'Order ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (id: string) => `#${id.slice(-6).toUpperCase()}`
+      title: 'Image',
+      dataIndex: 'images',
+      key: 'images',
+      width: 80,
+      render: (images: string[]) => {
+        const imageUrl = Array.isArray(images) && images.length > 0 ? images[0] : null
+        return (
+          <Image
+            width={50}
+            height={50}
+            src={imageUrl || ''}
+            alt="Product"
+            style={{ objectFit: 'cover', borderRadius: '4px' }}
+            fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgeHANwDrkl1AuO+pmgAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAwqADAAQAAAABAAAAwwAAAAD9b/HnAAAHlklEQVR4Ae3dP3Ik1RnG4W+FgYxN"
+          />
+        )
+      },
     },
     {
-      title: 'Customer',
-      dataIndex: 'customerName',
-      key: 'customerName',
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a: Product, b: Product) => a.name.localeCompare(b.name),
     },
     {
-      title: 'Total',
-      dataIndex: 'total',
-      key: 'total',
-      render: (total: number) => `$${total.toFixed(2)}`
+      title: 'Category',
+      dataIndex: 'category',
+      key: 'category',
+      render: (category: string) => (
+        <Tag color="blue">{category}</Tag>
+      ),
+      sorter: (a: Product, b: Product) => a.category.localeCompare(b.category),
+    },
+    {
+      title: 'Price',
+      dataIndex: 'price',
+      key: 'price',
+      render: (price: number) => `$${price.toFixed(2)}`,
+      sorter: (a: Product, b: Product) => a.price - b.price,
+    },
+    {
+      title: 'Inventory',
+      dataIndex: 'inventory',
+      key: 'inventory',
+      sorter: (a: Product, b: Product) => a.inventory - b.inventory,
+      render: (inventory: number) => (
+        <Tag color={inventory > 10 ? 'green' : inventory > 0 ? 'orange' : 'red'}>
+          {inventory} in stock
+        </Tag>
+      ),
     },
     {
       title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => {
-        const colors = {
-          pending: 'orange',
-          processing: 'blue',
-          completed: 'green',
-          cancelled: 'red'
-        }
-        return <Tag color={colors[status as keyof typeof colors]}>{status.toUpperCase()}</Tag>
-      }
+      dataIndex: 'active',
+      key: 'active',
+      render: (active: boolean) => (
+        <Tag color={active ? 'green' : 'red'}>
+          {active ? 'Active' : 'Inactive'}
+        </Tag>
+      ),
     },
     {
-      title: 'Date',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date: string) => new Date(date).toLocaleDateString()
-    }
+      title: 'Featured',
+      dataIndex: 'featured',
+      key: 'featured',
+      render: (featured: boolean) => (
+        <Tag color={featured ? 'gold' : 'default'}>
+          {featured ? 'Yes' : 'No'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: Product) => (
+        <Space size="middle">
+          <Link href={`/admin/products/${record.id}`}>
+            <Button 
+              type="primary" 
+              icon={<EditOutlined />} 
+              size="small"
+            >
+              Edit
+            </Button>
+          </Link>
+          <Button 
+            type="primary" 
+            danger 
+            icon={<DeleteOutlined />} 
+            size="small"
+            onClick={() => handleDelete(record.id)}
+          >
+            Delete
+          </Button>
+        </Space>
+      ),
+    },
   ]
-
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '400px' 
-      }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
 
   return (
     <div>
-      <h1 style={{ marginBottom: '24px' }}>Dashboard Overview</h1>
-      
-      {/* Stats Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Total Products"
-              value={stats.totalProducts}
-              prefix={<ShoppingOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Total Orders"
-              value={stats.totalOrders}
-              prefix={<ShoppingCartOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Total Users"
-              value={stats.totalUsers}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#722ed1' }}
-            />
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Total Revenue"
-              value={stats.totalRevenue}
-              prefix={<DollarOutlined />}
-              precision={2}
-              valueStyle={{ color: '#f5222d' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Quick Actions */}
-      <Card title="Quick Actions" style={{ marginBottom: '24px' }}>
-        <Space size="middle" wrap>
+      <Card>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '24px'
+        }}>
+          <h1 style={{ margin: 0 }}>Product Management</h1>
           <Link href="/admin/products/new">
-            <Button type="primary" icon={<ShoppingOutlined />}>
+            <Button type="primary" icon={<PlusOutlined />}>
               Add New Product
             </Button>
           </Link>
-          <Link href="/admin/orders">
-            <Button icon={<ShoppingCartOutlined />}>
-              View All Orders
-            </Button>
-          </Link>
-          <Link href="/admin/users">
-            <Button icon={<UserOutlined />}>
-              Manage Users
-            </Button>
-          </Link>
-          <Button icon={<WarningOutlined />}>
-            View Analytics
-          </Button>
-        </Space>
-      </Card>
+        </div>
 
-      {/* Recent Orders */}
-      <Card 
-        title="Recent Orders" 
-        extra={
-          <Link href="/admin/orders">
-            <Button type="link">View All</Button>
-          </Link>
-        }
-      >
-        <Table 
-          dataSource={recentOrders}
-          columns={orderColumns}
+        <div style={{ marginBottom: '16px' }}>
+          <Search
+            placeholder="Search products..."
+            allowClear
+            size="large"
+            prefix={<SearchOutlined />}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ maxWidth: '400px' }}
+          />
+        </div>
+
+        <Table
+          dataSource={filteredProducts}
+          columns={columns}
           rowKey="id"
-          pagination={false}
-          locale={{ 
-            emptyText: 'No recent orders' 
+          loading={loading}
+          pagination={{
+            total: filteredProducts.length,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} of ${total} products`,
           }}
+          scroll={{ x: 800 }}
         />
       </Card>
     </div>

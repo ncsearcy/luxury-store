@@ -12,7 +12,7 @@ import {
   Upload, 
   message,
   Row,
-  Col,
+  Col, 
   Space
 } from 'antd'
 import { UploadOutlined, ArrowLeftOutlined } from '@ant-design/icons'
@@ -24,11 +24,17 @@ const { Option } = Select
 
 interface ProductFormData {
   name: string
-  description: string
+  description?: string
   price: number
   category: string
   inventory: number
-  imageUrl: string
+  sku?: string
+  brand?: string
+  material?: string
+  imageUrl?: string
+  images?: string[]
+  sizes?: string | string[] // Can be either string (comma-separated) or array
+  colors?: string | string[] // Can be either string (comma-separated) or array
   featured: boolean
 }
 
@@ -54,20 +60,39 @@ export default function NewProduct() {
     try {
       setLoading(true)
       
+      // Process form values to match database schema
+      const processedValues = {
+        ...values,
+        // Convert comma-separated strings to arrays, handling both string and array inputs
+        sizes: Array.isArray(values.sizes) 
+          ? values.sizes 
+          : (values.sizes ? values.sizes.split(',').map(s => s.trim()).filter(s => s) : []),
+        colors: Array.isArray(values.colors) 
+          ? values.colors 
+          : (values.colors ? values.colors.split(',').map(c => c.trim()).filter(c => c) : []),
+        // Handle images as array
+        images: values.imageUrl ? [values.imageUrl] : [],
+      }
+      
+      console.log('Submitting product data:', processedValues) // Debug log
+      
       const response = await fetch('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(processedValues),
       })
+
+      const responseData = await response.json()
+      console.log('API Response:', responseData) // Debug log
 
       if (response.ok) {
         message.success('Product created successfully!')
         router.push('/admin/products')
       } else {
-        const error = await response.json()
-        message.error(error.message || 'Failed to create product')
+        console.error('API Error:', responseData)
+        message.error(responseData.error || 'Failed to create product')
       }
     } catch (error) {
       console.error('Error creating product:', error)
@@ -155,17 +180,37 @@ export default function NewProduct() {
             name="description"
             label="Description"
             rules={[
-              { required: true, message: 'Please enter product description' },
               { min: 10, message: 'Description must be at least 10 characters' }
             ]}
           >
             <TextArea 
               rows={4} 
-              placeholder="Enter product description"
+              placeholder="Enter product description (optional)"
               maxLength={1000}
               showCount
             />
           </Form.Item>
+
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item
+                name="sku"
+                label="SKU (Optional)"
+                extra="Leave blank to auto-generate"
+              >
+                <Input placeholder="AUTO-GENERATED" size="large" />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item
+                name="brand"
+                label="Brand (Optional)"
+              >
+                <Input placeholder="Enter brand name" size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Row gutter={24}>
             <Col span={8}>
@@ -222,13 +267,41 @@ export default function NewProduct() {
 
           <Form.Item
             name="imageUrl"
-            label="Product Image URL"
+            label="Primary Image URL (Optional)"
             rules={[
-              { required: true, message: 'Please enter image URL' },
               { type: 'url', message: 'Please enter a valid URL' }
             ]}
           >
             <Input placeholder="https://example.com/image.jpg" size="large" />
+          </Form.Item>
+
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item
+                name="material"
+                label="Material (Optional)"
+              >
+                <Input placeholder="e.g., Cotton, Steel, Gold" size="large" />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item
+                name="sizes"
+                label="Available Sizes (Optional)"
+                extra="Enter sizes separated by commas"
+              >
+                <Input placeholder="S, M, L, XL" size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="colors"
+            label="Available Colors (Optional)"
+            extra="Enter colors separated by commas"
+          >
+            <Input placeholder="Red, Blue, Black, White" size="large" />
           </Form.Item>
 
           <div style={{ marginTop: '24px' }}>
